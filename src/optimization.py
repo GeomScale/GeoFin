@@ -20,26 +20,13 @@ import qpsolvers
 from qpsolvers import solve_qp
 import scipy
 
-
-
 from helper_functions import nearestPD
 from covariance import Covariance
 from constraints import Constraints
 from optimization_data import OptimizationData
 import qp_problems
 
-
-
-
-
-
-
 # https://github.com/qpsolvers/qpsolvers
-
-
-
-
-
 
 
 class OptimizationParameter(dict):
@@ -169,7 +156,11 @@ class LeastSquares(Optimization):
         # 0.5 * w * P * w' - q * w' + constant
         P = 2 * (X.T @ X)
         q = -2 * X.T @ y
+<<<<<<< HEAD
         constant = (y.T @ y)
+=======
+        constant = (y.T @ y).item()
+>>>>>>> ed1903e172f1f5a14ecb628f4567d7ddfe22bfe4
 
         l2_penalty = self.params.get('l2_penalty')
         if l2_penalty is not None:
