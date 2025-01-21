@@ -11,6 +11,7 @@ Licensed under GNU LGPL.3, see LICENCE file
 
 
 import numpy as np
+import pandas as pd
 import qpsolvers
 import scipy
 import pickle
@@ -37,29 +38,30 @@ class QuadraticProgram(dict):
         super(QuadraticProgram, self).__init__(*args, **kwargs)
         self.solver = self['params']['solver_name']
 
-    def linearize_turnover_constraint(self, x_init: np.ndarray, to_budget=float('inf')) -> None:
+    # z = |x-x0| -> x - x0 <= z <= x0 - x
+    def linearize_turnover_constraint(self, init_weights: pd.Series, to_budget=float('inf')) -> None:
         # Dimensions
         n = len(self.get('q'))
+        N = len(init_weights.keys())
         m = 0 if self.get('G') is None else self.get('G').shape[0]
 
         # Objective
-        P = np.pad(self['P'], (0, n)) if self.get('P') is not None else None
-        q = np.pad(self['q'], (0, n)) if self.get('q') is not None else None
+        P = np.pad(self['P'], (0, 2 * N - n)) if self.get('P') is not None else None
+        q = np.pad(self['q'], (0, 2 * N - n)) if self.get('q') is not None else None
 
         # Inequality constraints
-        G = np.zeros(shape=(m + 2 * n + 1, 2 * n))
+        G = np.zeros(shape=(m + 2 * N + 1, 2 * N))
         if self.get('G') is not None:
             G[0:m, 0:n] = self.get('G')
-        G[m:(m + n), 0:n] = np.eye(n)
-        G[m:(m + n), n:(2 * n)] = np.eye(n) * (-1)
-        G[(m + n):(m + 2 * n), 0:n] = np.eye(n) * (-1)
-        G[(m + n):(m + 2 * n), n:(2 * n)] = np.eye(n) * (-1)
-        G[(m + 2 * n),] = np.append(np.zeros(n), np.ones(n))
+        G[m:(m + N), 0:N] = np.eye(N)
+        G[m:(m + N), N:(2 * N)] = np.eye(N) * (-1)
+        G[(m + N):(m + 2 * N), 0:N] = np.eye(N) * (-1)
+        G[(m + N):(m + 2 * N), N:(2 * N)] = np.eye(N) * (-1)
+        G[(m + 2 * N),] = np.append(np.zeros(N), np.ones(N))
         h = self.get('h') if self.get('h') is not None else np.empty(shape=(0,))
-        h = np.append(h, np.append(np.append(x_init, -x_init), to_budget))
+        h = np.append(h, np.append(np.append(init_weights, -init_weights), to_budget))
 
         # Equality constraints
-        #A = concat_constant_columns(self.get('A'), n)
         A = np.pad(self['A'], [(0, 0), (0, n)]) if self.get('A') is not None else None
 
         lb = np.pad(self['lb'], (0, n)) if self.get('lb') is not None else None
@@ -118,7 +120,7 @@ class QuadraticProgram(dict):
         return None
 
     def linearize_turnover_objective(self,
-                                     x_init: np.ndarray,
+                                     x_init: pd.Series,
                                      transaction_cost=0.002) -> None:
         # Dimensions
         n = len(self.get('q'))

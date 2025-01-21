@@ -64,6 +64,7 @@ class Optimization(ABC):
         self.constraints = Constraints() if constraints is None else constraints
         self.model = None
         self.results = None
+        self.x0 = None
 
     @abstractmethod
     def set_objective(self, optimization_data: OptimizationData) -> None:
@@ -124,8 +125,9 @@ class Optimization(ABC):
 
         # Choose which reference position to be used
         tocon = self.constraints.l1.get('turnover')
-        x0 = tocon['x0'] if tocon is not None and tocon.get('x0') is not None else self.params.get('x0')
-        x_init = {asset: x0.get(asset, 0) for asset in universe} if x0 is not None else None
+        x0 = tocon['x0'] if tocon is not None and tocon.get('x0') is not None else self.x0
+        extra_var = x0.keys() - universe
+        x_init = {asset: x0.get(asset, 0) for asset in list(universe) + list(extra_var)} if x0 is not None else None
 
         # Transaction cost in the objective
         transaction_cost = self.params.get('transaction_cost')

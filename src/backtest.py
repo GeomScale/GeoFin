@@ -133,19 +133,19 @@ class BacktestService():
             item_builder(self, rebdate)
         return None
 
-    def build_optimization(self, rebdate: str) -> None:
+    def build_optimization(self, rebdate: str, init_weight: dict) -> None:
 
         # Initialize the optimization constraints
         self.optimization.constraints = Constraints(selection = self.selection.selected)
-
+        self.optimization.x0 = init_weight
         # Loop over the optimization_item_builders items
         for item_builder in self.optimization_item_builders.values():
             item_builder(self, rebdate)
         return None
 
-    def prepare_rebalancing(self, rebalancing_date: str) -> None:
-        self.build_selection(rebdate = rebalancing_date)
-        self.build_optimization(rebdate = rebalancing_date)
+    def prepare_rebalancing(self, rebalancing_date: str, init_weight: dict) -> None:
+        self.build_selection(rebalancing_date)
+        self.build_optimization(rebalancing_date, init_weight = init_weight)
         return None
 
 
@@ -187,7 +187,8 @@ class Backtest:
                   rebalancing_date: str) -> None:
 
         # Prepare the rebalancing, i.e., the optimization problem
-        bs.prepare_rebalancing(rebalancing_date = rebalancing_date)
+        prev_weight = self.strategy.portfolios[-1].weights if self.strategy.portfolios else {}
+        bs.prepare_rebalancing(rebalancing_date = rebalancing_date, init_weight = prev_weight)
 
         # Solve the optimization problem
         try:
@@ -205,8 +206,7 @@ class Backtest:
             if not bs.settings.get('quiet'):
                 print(f'Rebalancing date: {rebalancing_date}')
 
-            self.rebalance(bs = bs,
-                           rebalancing_date = rebalancing_date)
+            self.rebalance(bs = bs, rebalancing_date = rebalancing_date)
 
             # Append portfolio to strategy
             weights = bs.optimization.results['weights']
@@ -251,19 +251,18 @@ def append_custom(backtest: Backtest,
         what = ['w_dict', 'objective']
 
     for key in what:
+        if key not in bs.optimization.results.keys():
+            continue
+
         if key == 'w_dict':
             w_dict = bs.optimization.results['w_dict']
-            for key in w_dict.keys():
-                weights = w_dict[key]                    
-                if hasattr(weights, 'to_dict'):
-                    weights = weights.to_dict()
+            for w_key, w_val in w_dict.items():
+                weights = w_val.to_dict() if hasattr(w_val, 'to_dict') else w_val
                 portfolio = Portfolio(rebalancing_date = rebalancing_date, weights = weights)
                 backtest.append_output(date_key = rebalancing_date,
-                                        output_key = f'weights_{key}',
+                                        output_key = f'weights_{w_key}',
                                         value = pd.Series(portfolio.weights))
         else:
-            if not key in bs.optimization.results.keys():
-                continue
             backtest.append_output(date_key = rebalancing_date,
                                     output_key = key,
                                     value = bs.optimization.results[key])

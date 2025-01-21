@@ -285,3 +285,18 @@ def bibfn_box_constraints(bs, rebdate: str, **kwargs) -> None:
                                         lower = lower,
                                         upper = upper)
     return None
+
+
+def bibfn_l1_constraints(bs, rebdate: str, **kwargs) -> None:
+
+    '''
+    Backtest item builder function for setting the L1 constraints.
+    '''
+
+    # Arguments
+    name = kwargs.get('name')
+    rhs = kwargs.get('rhs')
+
+    # Constraints
+    bs.optimization.constraints.add_l1(name = name, rhs = rhs)
+    return None
