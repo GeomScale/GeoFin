@@ -1,0 +1,80 @@
+name: PR Testing
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ['3.9', '3.10', '3.11']
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
+        cache: 'pip'
+        cache-dependency-path: '**/requirements.txt'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pytest pytest-cov
+
+    - name: Add src to PYTHONPATH
+      run: |
+        echo "PYTHONPATH=$PYTHONPATH:${{ github.workspace }}/src" >> $GITHUB_ENV
+
+    - name: Create test results directory
+      run: mkdir -p junit
+
+    - name: Run tests
+      run: |
+        pytest test/test_quadratic_program.py \
+          --doctest-modules \
+          --junitxml=junit/test-results-${{ matrix.python-version }}.xml \
+          --cov=src \
+          --cov-report=xml
+
+    - name: Upload pytest test results
+      uses: actions/upload-artifact@v4
+      with:
+        name: pytest-results-${{ matrix.python-version }}
+        path: |
+          junit/test-results-${{ matrix.python-version }}.xml
+          coverage.xml
+      if: always()
+
+  # Optional: Codecov coverage reporting (uncomment and configure if you use coverage)
+  # coverage:
+  #   needs: lint-and-test
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #     - name: Set up Python
+  #       uses: actions/setup-python@v5
+  #       with:
+  #         python-version: '3.10'
+  #     - name: Install dependencies
+  #       run: |
+  #         python -m pip install --upgrade pip
+  #         pip install -r requirements.txt
+  #         pip install pytest-cov
+  #     - name: Run coverage
+  #       run: |
+  #         pytest --cov=./ --cov-report=xml
+  #     - name: Upload coverage to Codecov
+  #       uses: codecov/codecov-action@v4
+  #       env:
+  #         CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}

@@ -1,0 +1,22 @@
+# Core numerical and scientific libraries
+numpy>=1.21.0
+pandas>=1.3.4,<2.0.0
+scipy>=1.10.1
+scikit-learn>=1.0.2,<2.0.0
+pandas
+
+# Optimization
+qpsolvers[open_source_solvers]>=4.4.0
+
+pillow
+pyparsing
+exceptiongroup
+pluggy
+
+# Visualization
+matplotlib>=3.5.3,<4.0.0
+iniconfig
+
+# Testing
+pytest>=6.2.5
+pytest-cov>=4.1.0
