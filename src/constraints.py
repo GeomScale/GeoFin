@@ -18,11 +18,38 @@ from typing import Dict
 
 
 
-
-
 class Constraints:
+    """
+    Handles constraints for portfolio optimization.
+
+    Attributes
+    ----------
+    selection : list[str]
+        List of asset names or identifiers to which constraints are applied.
+    budget : dict
+        Budget constraint configuration, including matrix, sense, and RHS values.
+    box : dict
+        Box constraint configuration, including type, lower, and upper bounds.
+    linear : dict
+        Linear constraint configuration, including matrix, sense, and RHS values.
+    l1 : dict
+        L1 constraint configuration, including custom parameters.
+    """
 
     def __init__(self, selection="NA") -> None:
+        """
+        Initializes the Constraints object.
+
+        Parameters
+        ----------
+        selection : list[str]
+            A list of asset identifiers. Defaults to "NA".
+
+        Raises
+        ------
+        ValueError
+            If the selection is not a list of strings.
+        """
         if not all(isinstance(item, str) for item in selection):
             raise ValueError("argument 'selection' has to be a character vector.")
 
@@ -34,9 +61,33 @@ class Constraints:
         return None
 
     def __str__(self) -> str:
+        """
+        Returns a string representation of the Constraints object.
+
+        Returns
+        -------
+        str
+            String representation of the Constraints object.
+        """
         return ' '.join(f'\n{key}:\n\n{vars(self)[key]}\n' for key in vars(self).keys())
 
     def add_budget(self, rhs=1, sense='=') -> None:
+        """
+        Adds a budget constraint to the optimization.
+
+        Parameters
+        ----------
+        rhs : float, optional
+            Right-hand side of the constraint, by default 1.
+        sense : str, optional
+            Constraint sense, by default '='.
+
+        Raises
+        ------
+        Warning
+            If an existing budget constraint is overwritten.
+        """
+
         if self.budget.get('rhs') is not None:
             warnings.warn("Existing budget constraint is overwritten\n")
 
@@ -50,6 +101,24 @@ class Constraints:
                 box_type="LongOnly",
                 lower=None,
                 upper=None) -> None:
+        """
+        Adds a box constraint to the optimization.
+
+        Parameters
+        ----------
+        box_type : str, optional
+            Type of box constraint, by default "LongOnly".
+        lower : float or pd.Series, optional
+            Lower bound for the constraints, by default None.
+        upper : float or pd.Series, optional
+            Upper bound for the constraints, by default None.
+
+        Raises
+        ------
+        ValueError
+            If any lower bound exceeds its corresponding upper bound.
+        """
+
         boxcon = box_constraint(box_type, lower, upper)
 
         if np.isscalar(boxcon['lower']):
@@ -69,6 +138,27 @@ class Constraints:
                    sense: str = '=',
                    rhs=None,
                    name: str = None) -> None:
+        """
+        Adds a linear constraint to the optimization.
+
+        Parameters
+        ----------
+        Amat : pd.DataFrame, optional
+            Coefficient matrix for the linear constraints, by default None.
+        a_values : pd.Series, optional
+            Coefficient values for a single linear constraint, by default None.
+        sense : str, optional
+            Constraint sense, by default '='.
+        rhs : float or pd.Series, optional
+            Right-hand side of the constraints, by default None.
+        name : str, optional
+            Name for the constraint, by default None.
+
+        Raises
+        ------
+        ValueError
+            If both Amat and a_values are not provided.
+        """
         if Amat is None:
             if a_values is None:
                 raise ValueError("Either 'Amat' or 'a_values' must be provided.")
@@ -99,6 +189,28 @@ class Constraints:
                rhs=None,
                x0=None,
                *args, **kwargs) -> None:
+        """
+        Adds an L1 constraint to the optimization.
+
+        Parameters
+        ----------
+        name : str
+            Name of the L1 constraint.
+        rhs : float
+            Right-hand side of the constraint.
+        x0 : dict, optional
+            Initial values for the constraint, by default None.
+        *args :
+            Additional positional arguments.
+        **kwargs :
+            Additional keyword arguments.
+
+        Raises
+        ------
+        TypeError
+            If rhs is not provided.
+        """
+                
         if rhs is None:
             raise TypeError("argument 'rhs' is required.")
         con = {'rhs': rhs}
@@ -112,6 +224,21 @@ class Constraints:
         return None
 
     def to_GhAb(self, lbub_to_G: bool = False) -> Dict[str, pd.DataFrame]:
+
+        """
+        Converts constraints to G, h, A, and b matrices for optimization solvers.
+
+        Parameters
+        ----------
+        lbub_to_G : bool, optional
+            Whether to include lower and upper bounds in G, by default False.
+
+        Returns
+        -------
+        dict
+            A dictionary containing G, h, A, and b matrices.
+        """
+
         A = None
         b = None
         G = None
@@ -173,11 +300,48 @@ class Constraints:
 # --------------------------------------------------------------------------
 
 def match_arg(x, lst):
+    """
+    Finds and returns the first match of an element in a list.
+
+    Parameters
+    ----------
+    x : str
+        Element to search for.
+    lst : list[str]
+        List to search within.
+
+    Returns
+    -------
+    str
+        The first matching element in the list.
+    """
     return [el for el in lst if x in el][0]
 
 def box_constraint(box_type="LongOnly",
                    lower=None,
                    upper=None) -> dict:
+    """
+    Creates a box constraint configuration.
+
+    Parameters
+    ----------
+    box_type : str, optional
+        Type of box constraint (e.g., "LongOnly", "LongShort", "Unbounded"), by default "LongOnly".
+    lower : float, optional
+        Lower bound, by default None.
+    upper : float, optional
+        Upper bound, by default None.
+
+    Returns
+    -------
+    dict
+        A dictionary containing box constraint settings.
+
+    Raises
+    ------
+    ValueError
+        If bounds are inconsistent with the box type.
+    """
     box_type = match_arg(box_type, ["LongOnly", "LongShort", "Unbounded"])
 
     if box_type == "Unbounded":
@@ -208,6 +372,27 @@ def linear_constraint(Amat=None,
                       rhs=float("inf"),
                       index_or_name=None,
                       a_values=None) -> dict:
+    """
+    Creates a linear constraint configuration.
+
+    Parameters
+    ----------
+    Amat : pd.DataFrame, optional
+        Coefficient matrix for the linear constraints, by default None.
+    sense : str, optional
+        Constraint sense (e.g., "=", "<=", ">="), by default "=".
+    rhs : float, optional
+        Right-hand side of the constraint, by default infinity.
+    index_or_name : str, optional
+        Index or name of the constraint, by default None.
+    a_values : pd.Series, optional
+        Coefficient values for the constraint, by default None.
+
+    Returns
+    -------
+    dict
+        A dictionary containing the linear constraint configuration.
+    """
     ans = {'Amat': Amat,
            'sense': sense,
            'rhs': rhs}

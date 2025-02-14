@@ -7,90 +7,151 @@ Copyright (c) 2024 Cyril Bachelard
 Licensed under GNU LGPL.3, see LICENCE file
 '''
 
-
 ############################################################################
-### CLASS BacktestItemBuilde AND BACKTEST ITEM BUILDER FUNCTIONS
+### CLASS BacktestItemBuilder AND BACKTEST ITEM BUILDER FUNCTIONS
 ############################################################################
-
-
-# Notice:
-# The logic underlying the approach to build backtest items favours flexibility over safety !
-
-
 
 from typing import Any
-
 import pandas as pd
 import numpy as np
 from abc import ABC, abstractmethod
 
 
-
-
-
-# --------------------------------------------------------------------------
-# Classes
-# --------------------------------------------------------------------------
-
 class BacktestItemBuilder(ABC):
+    """
+    Abstract base class for building backtest items.
+
+    This class provides a flexible framework for defining how items are built
+    during backtesting, favoring flexibility over safety.
+
+    Attributes
+    ----------
+    arguments : dict[str, Any]
+        A dictionary of arguments used for item construction.
+    """
 
     def __init__(self, **kwargs):
+        """
+        Initializes the BacktestItemBuilder with provided arguments.
+
+        Parameters
+        ----------
+        **kwargs :
+            Key-value pairs of arguments for item building.
+        """
         self._arguments = {}
         self._arguments.update(kwargs)
 
     @property
     def arguments(self) -> dict[str, Any]:
+        """
+        Returns the arguments dictionary.
+
+        Returns
+        -------
+        dict[str, Any]
+            A dictionary of arguments.
+        """
         return self._arguments
 
     @arguments.setter
     def arguments(self, value: dict[str, Any]) -> None:
+        """
+        Sets the arguments dictionary.
+
+        Parameters
+        ----------
+        value : dict[str, Any]
+            A new dictionary of arguments.
+        """
         self._arguments = value
 
     @abstractmethod
     def __call__(self, service, rebdate: str) -> None:
+        """
+        Abstract method to build the backtest item.
+
+        Parameters
+        ----------
+        service : Any
+            The backtest service instance.
+        rebdate : str
+            The rebalancing date.
+        """
         raise NotImplementedError("Method '__call__' must be implemented in derived class.")
 
 
-
 class SelectionItemBuilder(BacktestItemBuilder):
+    """
+    Builds selection items for backtesting based on a custom function.
+
+    Methods
+    -------
+    __call__(bs, rebdate)
+        Constructs and adds a selection item to the backtest service.
+    """
 
     def __call__(self, bs, rebdate: str) -> None:
+        """
+        Constructs and adds a selection item to the backtest service.
 
-        '''
-        Build selection item from a custom function.
-        '''
+        Parameters
+        ----------
+        bs : Any
+            The backtest service instance.
+        rebdate : str
+            The rebalancing date.
 
+        Raises
+        ------
+        ValueError
+            If the custom function 'bibfn' is not defined or callable.
+        """
         selection_item_builder_fn = self.arguments.get('bibfn')
         if selection_item_builder_fn is None or not callable(selection_item_builder_fn):
             raise ValueError('bibfn is not defined or not callable.')
 
-        item_value = selection_item_builder_fn(bs = bs, rebdate = rebdate, **self.arguments)
+        item_value = selection_item_builder_fn(bs=bs, rebdate=rebdate, **self.arguments)
         item_name = self.arguments.get('item_name')
 
         # Add selection item
-        bs.selection.add_filtered(filter_name = item_name, value = item_value)
+        bs.selection.add_filtered(filter_name=item_name, value=item_value)
         return None
 
 
-
 class OptimizationItemBuilder(BacktestItemBuilder):
+    """
+    Builds optimization items for backtesting based on a custom function.
+
+    Methods
+    -------
+    __call__(bs, rebdate)
+        Constructs optimization data or constraints for the backtest service.
+    """
 
     def __call__(self, bs, rebdate: str) -> None:
+        """
+        Constructs optimization data or constraints for the backtest service.
 
-        '''
-        Build optimization item from a custom function.
-        '''
+        Parameters
+        ----------
+        bs : Any
+            The backtest service instance.
+        rebdate : str
+            The rebalancing date.
 
+        Raises
+        ------
+        ValueError
+            If the custom function 'bibfn' is not defined or callable.
+        """
         optimization_item_builder_fn = self.arguments.get('bibfn')
         if optimization_item_builder_fn is None or not callable(optimization_item_builder_fn):
             raise ValueError('bibfn is not defined or not callable.')
 
-        # Call the backtest item builder function. Notice that the function returns None,
-        # it modifies the backtest service in place.
-        optimization_item_builder_fn(bs = bs, rebdate = rebdate, **self.arguments)
+        # Call the custom function to modify the backtest service in place
+        optimization_item_builder_fn(bs=bs, rebdate=rebdate, **self.arguments)
         return None
-
-
 
 
 # --------------------------------------------------------------------------
@@ -98,50 +159,88 @@ class OptimizationItemBuilder(BacktestItemBuilder):
 # --------------------------------------------------------------------------
 
 def bibfn_selection_min_volume(bs, rebdate: str, **kwargs) -> pd.Series:
+    """
+    Filters assets based on minimum trading volume.
 
-    # Arguments
+    Parameters
+    ----------
+    bs : Any
+        The backtest service instance.
+    rebdate : str
+        The rebalancing date.
+    **kwargs :
+        Additional parameters including:
+        - 'width': The rolling window width (default: 365).
+        - 'agg_fn': Aggregation function applied to volume data (default: np.median).
+        - 'min_volume': Minimum volume threshold (default: 500,000).
+
+    Returns
+    -------
+    pd.Series
+        A series of selected assets meeting the volume threshold.
+    """
     width = kwargs.get('width', 365)
     agg_fn = kwargs.get('agg_fn', np.median)
     min_volume = kwargs.get('min_volume', 500_000)
 
-    # Volume data
     X_vol = (
-        bs.data.get_volume_series(end_date = rebdate, width = width)
-        .fillna(0).apply(agg_fn, axis = 0)
+        bs.data.get_volume_series(end_date=rebdate, width=width)
+        .fillna(0).apply(agg_fn, axis=0)
     )
 
-    # Filtering
     ids = [col for col in X_vol.columns if agg_fn(X_vol[col]) >= min_volume]
 
-    # Output
-    series = pd.Series(np.ones(len(ids)), index = ids, name = 'minimum_volume')
-    bs.rebalancing.selection.add_filtered(filter_name = series.name,
-                                            value = series)
+    series = pd.Series(np.ones(len(ids)), index=ids, name='minimum_volume')
+    bs.rebalancing.selection.add_filtered(filter_name=series.name, value=series)
     return None
 
 
 
 def bibfn_selection_data(bs, rebdate: str, **kwargs) -> pd.Series:
+    """
+    Selects all available assets from the return series.
 
-    '''
-    Backtest item builder function for defining the selection
-    based on all available return series.
-    '''
+    Parameters
+    ----------
+    bs : Any
+        The backtest service instance.
+    rebdate : str
+        The rebalancing date.
+    **kwargs :
+        Additional parameters.
 
+    Returns
+    -------
+    pd.Series
+        A binary series selecting all available assets.
+    """
     data = bs.data.get('return_series')
     if data is None:
         raise ValueError('Return series data is missing.')
 
-    return pd.Series(np.ones(data.shape[1], dtype = int), index = data.columns, name = 'binary')
+    return pd.Series(np.ones(data.shape[1], dtype=int), index=data.columns, name='binary')
+
 
 
 def bibfn_selection_ltr(bs, rebdate: str, **kwargs) -> pd.DataFrame:
+    """
+    Defines the selection based on a Learn-to-Rank model.
 
-    '''
-    Backtest item builder function for defining the selection
-    based on a Learn-to-Rank model.
-    '''
+    Parameters
+    ----------
+    bs : Any
+        The backtest service instance.
+    rebdate : str
+        The rebalancing date.
+    **kwargs :
+        Additional parameters, including 'params_xgb' for XGBoost training.
 
+    Returns
+    -------
+    pd.DataFrame
+        DataFrame with scores and binary selections.
+    """
+  
     # Arguments
     params_xgb = kwargs.get('params_xgb')
 
@@ -180,75 +279,94 @@ def bibfn_selection_ltr(bs, rebdate: str, **kwargs) -> pd.DataFrame:
                         }, index = scores.index)
 
 
-
 # --------------------------------------------------------------------------
 # Backtest item builder functions (bibfn) - Optimization data
 # --------------------------------------------------------------------------
 
 def bibfn_return_series(bs, rebdate: str, **kwargs) -> None:
+    """
+    Prepares single stock return series for optimization.
 
-    '''
-    Backtest item builder function for return series.
-    Prepares an element of bs.optimization_data with
-    single stock return series that are used for optimization.
-    '''
+    Parameters
+    ----------
+    bs : Any
+        The backtest service instance.
+    rebdate : str
+        The rebalancing date.
+    **kwargs :
+        Additional parameters, including:
+        - 'width': int
+            The rolling window size.
 
-    # Arguments
+    Raises
+    ------
+    ValueError
+        If the return series data is missing.
+
+    Returns
+    -------
+    None
+    """
     width = kwargs.get('width')
 
-    # Selection
     ids = bs.selection.selected
-
-    # Data
     data = bs.data.get('return_series')
     if data is None:
         raise ValueError('Return series data is missing.')
 
-    # Subset return series
     return_series = data[data.index <= rebdate].tail(width)[ids]
-
-    # Remove weekends
     return_series = return_series[return_series.index.dayofweek < 5]
 
-    # Output
     bs.optimization_data['return_series'] = return_series
     return None
 
-
 def bibfn_bm_series(bs, rebdate: str, **kwargs) -> None:
+    """
+    Prepares benchmark series for optimization.
 
-    '''
-    Backtest item builder function for benchmark series.
-    Prepares an element of bs.optimization_data with 
-    the benchmark series that is be used for optimization.
-    '''
+    Parameters
+    ----------
+    bs : Any
+        The backtest service instance.
+    rebdate : str
+        The rebalancing date.
+    **kwargs :
+        Additional parameters, including:
+        - 'width': int
+            The rolling window width.
+        - 'align': bool
+            Whether to align the benchmark series with return series.
 
-    # Arguments
+    Raises
+    ------
+    ValueError
+        If the benchmark return series data is missing.
+
+    Returns
+    -------
+    None
+    """
     width = kwargs.get('width')
     align = kwargs.get('align')
 
-    # Data
     data = bs.data.get('bm_series')
     if data is None:
         raise ValueError('Benchmark return series data is missing.')
 
-    # Subset the benchmark series
     bm_series = data[data.index <= rebdate].tail(width)
-
-    # Remove weekends
     bm_series = bm_series[bm_series.index.dayofweek < 5]
 
-    # Append the benchmark series to the optimization data
     bs.optimization_data['bm_series'] = bm_series
 
-    # Align the benchmark series to the return series
     if align:
         bs.optimization_data.align_dates(
-            variable_names = ['bm_series', 'return_series'],
-            dropna = True
+            variable_names=['bm_series', 'return_series'],
+            dropna=True
         )
 
     return None
+
+
 
 
 # --------------------------------------------------------------------------
@@ -256,32 +374,52 @@ def bibfn_bm_series(bs, rebdate: str, **kwargs) -> None:
 # --------------------------------------------------------------------------
 
 def bibfn_budget_constraint(bs, rebdate: str, **kwargs) -> None:
+    """
+    Sets the budget constraint for the optimization.
 
-    '''
-    Backtest item builder function for setting the budget constraint.
-    '''
+    Parameters
+    ----------
+    bs : Any
+        The backtest service instance.
+    rebdate : str
+        The rebalancing date.
+    **kwargs :
+        Additional parameters, including 'budget' (default: 1).
 
-    # Arguments
+    Returns
+    -------
+    None
+    """
     budget = kwargs.get('budget', 1)
-
-    # Add constraint
-    bs.optimization.constraints.add_budget(rhs = budget, sense = '=')
+    bs.optimization.constraints.add_budget(rhs=budget, sense='=')
     return None
 
-
 def bibfn_box_constraints(bs, rebdate: str, **kwargs) -> None:
+    """
+    Sets the box constraints for the optimization.
 
-    '''
-    Backtest item builder function for setting the box constraints.
-    '''
+    Parameters
+    ----------
+    bs : Any
+        The backtest service instance.
+    rebdate : str
+        The rebalancing date.
+    **kwargs :
+        Additional parameters, including:
+        - 'lower': Lower bound (default: 0).
+        - 'upper': Upper bound (default: 1).
+        - 'box_type': Type of box constraint (default: 'LongOnly').
 
-    # Arguments
+    Returns
+    -------
+    None
+    """
     lower = kwargs.get('lower', 0)
     upper = kwargs.get('upper', 1)
     box_type = kwargs.get('box_type', 'LongOnly')
-
-    # Constraints
-    bs.optimization.constraints.add_box(box_type = box_type,
-                                        lower = lower,
-                                        upper = upper)
+    bs.optimization.constraints.add_box(box_type=box_type, lower=lower, upper=upper)
     return None
+
+
+
+
