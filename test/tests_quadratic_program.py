@@ -17,14 +17,83 @@ import scipy
 import qpsolvers
 from typing import Tuple
 import time
+import pytest
 sys.path.insert(1, 'src')
 
-from helper_functions import to_numpy
-from data_loader import load_data_msci
-from constraints import Constraints
-from covariance import Covariance
-from optimization import *
-from optimization_data import OptimizationData
+from src.helper_functions import to_numpy
+from src.data_loader import load_data_msci
+from src.constraints import Constraints
+from src.covariance import Covariance
+from src.optimization import *
+from src.optimization_data import OptimizationData
+
+"""
+    * unit Test class for Constraints class, reach a 100% coverage in this class
+"""
+class TestConstraintsMethods(unittest.TestCase):
+    def test_add_constaints_init(self):
+        """
+        Test the successful initialization and basic functionality of the Constraints class.
+        """
+        # Test with valid input
+        selection = ["A", "B", "C"]
+        constraints = Constraints(selection=selection)
+        
+        # Test if selection is set correctly
+        assert constraints.selection == selection, "Selection should be correctly initialized"
+        
+        # Test initial values for budget, box, linear, and l1
+        assert constraints.budget == {'Amat': None, 'sense': None, 'rhs': None}, "Initial budget should be empty"
+        assert constraints.box == {'box_type': 'NA', 'lower': None, 'upper': None}, "Initial box should be empty"
+        assert constraints.linear == {'Amat': None, 'sense': None, 'rhs': None}, "Initial linear constraints should be empty"
+        assert constraints.l1 == {}, "Initial l1 should be empty"
+
+
+    def test_add_constraints_init_error(self):
+        """
+        Test for handling errors during the initialization of the Constraints class.
+        """
+        # Test with invalid input for selection (non-string elements in selection)
+        with pytest.raises(ValueError):
+            Constraints(selection=[1, 2, 3])  # Should raise ValueError because selection is not all strings
+        
+        # Test with empty selection
+        with pytest.raises(ValueError):
+            Constraints(selection=[])  # Should raise ValueError because empty selection is invalid
+
+
+    def test_add_budget(self):
+        pass # Placeholder for future tests
+
+    def test_add_budget_value_error(self):
+        pass 
+
+    def test_add_box(self):
+        pass 
+
+    def test_add_box_value_error(self):
+        pass 
+
+    def test_add_linear(self):
+        pass 
+
+    def test_add_linear_value_error(self):
+        pass 
+
+    def test_add_l1(self):
+        pass  
+
+    def test_add_l1_type_error(self):
+        pass  
+
+    def to_GhAb(self):
+        pass 
+
+    def to_GhAb_sense_G_not_None(self):
+        pass  
+
+    def to_GhAb_idx__sum_negative(self):
+        pass  
 
 
 

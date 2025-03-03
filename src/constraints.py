@@ -21,8 +21,48 @@ from typing import Dict
 
 
 class Constraints:
+    """
+    A class to define and manage constraints for an optimization problem.
+
+    This class allows users to define different types of constraints such as 
+    budget, box, linear, and L1 constraints, and then store and manipulate them.
+    
+    Attributes:
+        selection (str or list of str): A vector of selection criteria, typically representing 
+                                         decision variables.
+        budget (dict): Contains budget-related constraints with keys 'Amat', 'sense', and 'rhs'.
+        box (dict): Contains box constraints, including 'box_type', 'lower', and 'upper'.
+        linear (dict): Contains linear constraints with keys 'Amat', 'sense', and 'rhs'.
+        l1 (dict): Contains L1 regularization constraints with additional user-defined parameters.
+    
+    Methods:
+        __init__(self, selection="NA"):
+            Initializes the Constraints object.
+        __str__(self):
+            Provides a string representation of the current constraints.
+        add_budget(self, rhs=1, sense='='):
+            Adds a budget constraint to the object.
+        add_box(self, box_type="LongOnly", lower=None, upper=None):
+            Adds box constraints, including lower and upper bounds for the selection.
+        add_linear(self, Amat=None, a_values=None, sense='=', rhs=None, name=None):
+            Adds linear constraints with a matrix, sense, and right-hand side values.
+        add_l1(self, name, rhs=None, x0=None, *args, **kwargs):
+            Adds L1 regularization constraints with a name and user-defined parameters.
+        to_GhAb(self, lbub_to_G=False):
+            Converts the constraints to matrices suitable for optimization solvers.
+    """
 
     def __init__(self, selection="NA") -> None:
+        """
+        Initializes a Constraints object with the provided selection criteria.
+
+        Args:
+            selection (str or list of str): A vector of decision variables.
+                If a list is provided, it must consist of string items.
+
+        Raises:
+            ValueError: If any item in the selection is not a string.
+        """
         if not all(isinstance(item, str) for item in selection):
             raise ValueError("argument 'selection' has to be a character vector.")
 
@@ -34,9 +74,25 @@ class Constraints:
         return None
 
     def __str__(self) -> str:
+        """
+        Provides a string representation of the current constraints.
+
+        Returns:
+            str: A formatted string displaying the constraints defined for the object.
+        """
         return ' '.join(f'\n{key}:\n\n{vars(self)[key]}\n' for key in vars(self).keys())
 
     def add_budget(self, rhs=1, sense='=') -> None:
+        """
+        Adds a budget constraint to the object.
+
+        Args:
+            rhs (int or float): The right-hand side value of the budget constraint. Default is 1.
+            sense (str): The type of inequality ('=' or other). Default is '='.
+
+        Raises:
+            Warning: If the budget is being overwritten.
+        """
         if self.budget.get('rhs') is not None:
             warnings.warn("Existing budget constraint is overwritten\n")
 
@@ -50,6 +106,17 @@ class Constraints:
                 box_type="LongOnly",
                 lower=None,
                 upper=None) -> None:
+        """
+        Adds box constraints, including lower and upper bounds for the selection.
+
+        Args:
+            box_type (str): The type of box constraint. Default is "LongOnly".
+            lower (float or pd.Series): The lower bound of the box constraint.
+            upper (float or pd.Series): The upper bound of the box constraint.
+
+        Raises:
+            ValueError: If any lower bound is higher than the corresponding upper bound.
+        """
         boxcon = box_constraint(box_type, lower, upper)
 
         if np.isscalar(boxcon['lower']):
@@ -69,6 +136,19 @@ class Constraints:
                    sense: str = '=',
                    rhs=None,
                    name: str = None) -> None:
+        """
+        Adds linear constraints with a matrix, sense, and right-hand side values.
+
+        Args:
+            Amat (pd.DataFrame, optional): The matrix of coefficients for the linear constraints.
+            a_values (pd.Series, optional): The coefficients as a series if Amat is not provided.
+            sense (str or pd.Series): The inequality type ('=', '<=', '>=').
+            rhs (int, float, or pd.Series): The right-hand side values for the constraints.
+            name (str, optional): The name of the constraint matrix.
+
+        Raises:
+            ValueError: If neither Amat nor a_values is provided.
+        """
         if Amat is None:
             if a_values is None:
                 raise ValueError("Either 'Amat' or 'a_values' must be provided.")
@@ -99,6 +179,19 @@ class Constraints:
                rhs=None,
                x0=None,
                *args, **kwargs) -> None:
+        """
+        Adds L1 regularization constraints with a name and user-defined parameters.
+
+        Args:
+            name (str): The name of the L1 constraint.
+            rhs (int or float): The right-hand side value for the L1 constraint.
+            x0 (optional): The initial value for the constraint.
+            *args: Additional arguments to be passed.
+            **kwargs: Additional keyword arguments to be passed.
+
+        Raises:
+            TypeError: If rhs is not provided.
+        """
         if rhs is None:
             raise TypeError("argument 'rhs' is required.")
         con = {'rhs': rhs}
@@ -112,6 +205,16 @@ class Constraints:
         return None
 
     def to_GhAb(self, lbub_to_G: bool = False) -> Dict[str, pd.DataFrame]:
+        """
+        Converts the constraints to matrices suitable for optimization solvers.
+
+        Args:
+            lbub_to_G (bool): If True, box constraints are converted to inequality constraints in G and h.
+                Default is False.
+
+        Returns:
+            dict: A dictionary containing matrices for inequality (G, h) and equality (A, b) constraints.
+        """
         A = None
         b = None
         G = None
