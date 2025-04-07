@@ -54,11 +54,31 @@ class Objective(dict):
 
 
 class Optimization(ABC):
+    """
+    Abstract base class for portfolio optimization strategies.
+
+    Attributes:
+        params (OptimizationParameter): Parameters for the optimizer.
+        objective (Objective): Objective function components.
+        constraints (Constraints): Portfolio constraints.
+        model (any): Optimization model instance.
+        results (dict): Stores the results after solving the optimization.
+    """
 
     def __init__(self,
                  params: OptimizationParameter = None,
                  constraints: Constraints = None,
                  **kwargs):
+        """
+        Initialize the Optimization class.
+
+        Args:
+            params (OptimizationParameter, optional): Parameters for the optimizer. 
+                If not provided, a new instance is created using kwargs.
+            constraints (Constraints, optional): Constraints applied to the portfolio. 
+                Defaults to an empty Constraints object.
+            **kwargs: Additional parameters passed to OptimizationParameter.
+        """
         self.params = OptimizationParameter(**kwargs) if params is None else params
         self.objective = Objective()
         self.constraints = Constraints() if constraints is None else constraints
@@ -67,14 +87,41 @@ class Optimization(ABC):
 
     @abstractmethod
     def set_objective(self, optimization_data: OptimizationData) -> None:
+        """
+        Define the objective function for the optimization problem.
+
+        This method must be implemented in subclasses.
+
+        Args:
+            optimization_data (OptimizationData): Input data required to define the objective,
+                such as return series or benchmark data.
+
+        Raises:
+            NotImplementedError: If not implemented in the derived class.
+        """
         raise NotImplementedError("Method 'set_objective' must be implemented in derived class.")
 
     @abstractmethod
     def solve(self) -> bool:
+        """
+        Solves the optimization problem.
+
+        Returns:
+            bool: Status indicating whether the solution was found successfully.
+        """
         self.solve_qpsolvers()
         return self.results['status']
 
     def solve_qpsolvers(self) -> None:
+        """
+        Solves the optimization problem using a quadratic programming solver from qpsolvers.
+
+        It builds the optimization model using objective components and constraints,
+        runs the solver, and stores the results including weights and solution status.
+
+        Returns:
+        None
+    """
         self.model_qpsolvers()
         self.model.solve()
         universe = self.constraints.selection
@@ -89,6 +136,16 @@ class Optimization(ABC):
         return None
 
     def model_qpsolvers(self) -> None:
+        """
+        Constructs the quadratic programming model for the optimization problem.
+
+        This method prepares the matrices for the objective function and constraints,
+        and initializes the optimization model. It also incorporates transaction cost,
+        turnover, and leverage constraints if provided.
+
+        Returns:
+            None
+        """
         # Ensure that P and q are numpy arrays
         if 'P' in self.objective.keys():
             P = to_numpy(self.objective['P'])
