@@ -162,7 +162,7 @@ class MeanVariance(Optimization):
                  **kwargs):
         super().__init__(**kwargs)
         self.covariance = Covariance() if covariance is None else covariance
-        self.mean_estimator = MeanEstimator() if mean_estimator is None else MeanEstimator
+        self.mean_estimator = MeanEstimator() if mean_estimator is None else mean_estimator
         self.params.setdefault('risk_aversion', 1)
 
     def set_objective(self, optimization_data: OptimizationData) -> None:
@@ -361,7 +361,7 @@ class PercentilePortfolios(Optimization):
                  n_percentiles = 5,  # creates quintile portfolios by default.
                  **kwargs):
         super().__init__(**kwargs)
-        self.estimator = estimator
+        self.estimator = MeanEstimator() if estimator is None else estimator
         self.params = {'solver_name': 'percentile',
                        'n_percentiles': n_percentiles,
                        'field': field}
